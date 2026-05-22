@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="?android:attr/listDivider"
+        android:showDividers="none">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SSH server"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/host"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="host (e.g. example.com)"
+            android:inputType="textUri"
+            android:autofillHints="" />
+
+        <EditText
+            android:id="@+id/port"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="port (22)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <EditText
+            android:id="@+id/user"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="ssh user"
+            android:inputType="text"
+            android:autofillHints="" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Authentication — fill ONE"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/key"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:hint="Private key (PEM) — -----BEGIN OPENSSH PRIVATE KEY-----…"
+            android:gravity="top|start"
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:fontFamily="monospace"
+            android:textSize="12sp"
+            android:autofillHints="" />
+
+        <EditText
+            android:id="@+id/password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="…or SSH password"
+            android:inputType="textPassword"
+            android:autofillHints="" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Remote bind (server side, -R)"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/remoteBindHost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="remote bind host (127.0.0.1 or 0.0.0.0)"
+            android:inputType="text"
+            android:autofillHints="" />
+
+        <EditText
+            android:id="@+id/remoteBindPort"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="remote bind port (e.g. 8080)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <CheckBox
+            android:id="@+id/killStale"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Kill stale sshd holding this port on reconnect" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:text="Sends fuser/lsof/ss + kill -9 to any sshd process owning the bind port (excluding the current session)." />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Local HTTP proxy"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/localProxyPort"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="local proxy port (8118)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <CheckBox
+            android:id="@+id/splitNetworks"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Split networks: Wi-Fi for SSH · Cellular for proxy" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:text="When enabled, the SSH tunnel binds to Wi-Fi and outbound proxy fetches bind to cellular. Requires both networks active." />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Airplane mode cycling"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/cycleEnabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Periodically cycle airplane mode (rotate cellular IP)" />
+
+        <EditText
+            android:id="@+id/cycleInterval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="interval between cycles (seconds, e.g. 600)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <EditText
+            android:id="@+id/cycleDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="airplane ON duration (seconds, e.g. 5)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <Button
+            android:id="@+id/a11yBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Set this app as the default digital assistant" />
+
+        <TextView
+            android:id="@+id/a11yStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="4dp"
+            android:text="" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Resilience"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/autoStart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start automatically on boot" />
+
+        <Button
+            android:id="@+id/battBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Disable battery optimization for this app" />
+
+        <TextView
+            android:id="@+id/battStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="4dp"
+            android:text="" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <Button
+            android:id="@+id/toggleBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:paddingBottom="24dp"
+            android:textIsSelectable="true"
+            android:text="" />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,5 @@
+-dontwarn org.slf4j.**
+-dontwarn javax.annotation.**
+-dontwarn org.bouncycastle.**
+-keep class org.bouncycastle.** { *; }
+-keep class net.schmizz.sshj.** { *; }
