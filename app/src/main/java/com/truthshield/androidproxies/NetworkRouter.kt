@@ -26,9 +26,19 @@ class NetworkRouter(context: Context) {
     }
 
     private val cellCb = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(n: Network) {
-            Log.i(TAG, "cellular available: $n")
-            cellRef.set(n)
+        // Only treat cellular as usable once it is VALIDATED (actually passing
+        // data), not merely available. After an airplane-mode reset the radio
+        // reports onAvailable well before data works; gating on VALIDATED keeps
+        // cellular() null until the link can really carry the proxied traffic,
+        // so it never gets bound prematurely.
+        override fun onCapabilitiesChanged(n: Network, caps: NetworkCapabilities) {
+            val ready = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            if (ready) {
+                if (cellRef.getAndSet(n) !== n) Log.i(TAG, "cellular validated: $n")
+            } else {
+                if (cellRef.compareAndSet(n, null)) Log.i(TAG, "cellular unvalidated: $n")
+            }
         }
         override fun onLost(n: Network) {
             Log.i(TAG, "cellular lost: $n")

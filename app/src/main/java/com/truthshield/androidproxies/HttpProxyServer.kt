@@ -147,8 +147,15 @@ class HttpProxyServer(
                 try { s.close() } catch (_: Exception) {}
                 return null
             }
-            try { net.bindSocket(s) } catch (e: Exception) {
-                Log.w(TAG, "bindSocket(cellular) failed", e)
+            try {
+                net.bindSocket(s)
+            } catch (e: Exception) {
+                // Do NOT fall through to an unbound connect: that would exit
+                // over the default network (Wi-Fi) and leak the proxied traffic
+                // off cellular. Refuse instead.
+                Log.w(TAG, "bindSocket(cellular) failed; refusing to avoid Wi-Fi leak", e)
+                try { s.close() } catch (_: Exception) {}
+                return null
             }
         }
         return try {

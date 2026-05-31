@@ -102,6 +102,7 @@ class ProxyService : Service() {
                 intervalSec = settings.cycleIntervalSec.coerceAtLeast(30),
                 airplaneOnDurationSec = settings.airplaneOnSec.coerceAtLeast(2),
                 tunnel = newTunnel,
+                router = router,
                 onStatus = { s -> lastStatus = s; updateNotification(s) },
             ).also { it.start() }
         }
