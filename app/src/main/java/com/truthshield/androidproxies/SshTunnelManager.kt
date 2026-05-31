@@ -167,28 +167,44 @@ class SshTunnelManager(
     }
 
     private fun killStaleHolderOfPort(c: SSHClient, port: Int) {
+        // We cannot locate the port holder via the listening socket. The
+        // sshd-session that owns a forwarded port starts as root and drops to
+        // the login user, which marks it non-dumpable; the kernel then makes
+        // /proc/<pid>/fd readable only by root. As the unprivileged login user
+        // (which is what this exec runs as) fuser/lsof/ss -p cannot map the
+        // socket to a PID, so the old script found nothing and never sent kill.
+        //
+        // Instead we identify stale holders by process identity: they are this
+        // user's own forwarding sshd-session processes ("<user>@notty", i.e. no
+        // controlling tty) left over from previous connections. We may still
+        // SIGKILL them (same real uid → signalling is permitted even though
+        // /proc inspection is not). We exclude our own process ancestry so we
+        // never kill the connection running this command.
         val script = """
             PORT=$port
-            pids=${'$'}({ fuser -n tcp ${'$'}PORT 2>/dev/null; lsof -ti tcp:${'$'}PORT 2>/dev/null; ss -Hntlp "sport = :${'$'}PORT" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2; } | tr '\n' ' ' | tr -s ' ')
-            me=${'$'}PPID
+            uid=${'$'}(id -u)
+            anc=" "
+            a=${'$'}${'$'}
+            while [ -n "${'$'}a" ] && [ "${'$'}a" -gt 1 ]; do
+              anc="${'$'}anc${'$'}a "
+              a=${'$'}(sed -E 's/^[0-9]+ \(.*\) [A-Za-z] ([0-9]+).*/\1/' "/proc/${'$'}a/stat" 2>/dev/null)
+            done
             killed=0
-            for p in ${'$'}pids; do
-              [ -z "${'$'}p" ] && continue
-              [ "${'$'}p" = "${'$'}me" ] && continue
-              n=${'$'}(ps -o comm= -p "${'$'}p" 2>/dev/null)
-              case "${'$'}n" in
-                sshd*) kill -9 "${'$'}p" 2>/dev/null && killed=${'$'}((killed+1)) ;;
-              esac
+            for p in ${'$'}(ps -o pid= -o args= -u "${'$'}uid" 2>/dev/null | awk '${'$'}2 ~ /^sshd/ && /@notty/ {print ${'$'}1}'); do
+              case "${'$'}anc" in *" ${'$'}p "*) continue ;; esac
+              kill -9 "${'$'}p" 2>/dev/null && killed=${'$'}((killed+1))
             done
             sleep 1
-            echo "killed=${'$'}killed"
+            echo "killed=${'$'}killed port=${'$'}PORT"
         """.trimIndent()
         val session = c.startSession()
         try {
             val cmd = session.exec(script)
             cmd.join(10, TimeUnit.SECONDS)
-            val output = cmd.inputStream.bufferedReader().readText().trim()
-            onStatus("Stale-port cleanup: $output")
+            val out = cmd.inputStream.bufferedReader().readText().trim()
+            val err = cmd.errorStream.bufferedReader().readText().trim()
+            val msg = if (err.isBlank()) out else "$out (stderr: $err)"
+            onStatus("Stale-port cleanup: $msg")
         } catch (e: Exception) {
             Log.w(TAG, "stale cleanup failed", e)
             onStatus("Stale-port cleanup failed: ${e.message}")
@@ -211,6 +227,10 @@ class SshTunnelManager(
                 val waitS = (10 + attempt * 10).coerceAtMost(60)
                 onStatus("Server port ${cfg.remoteBindPort} busy (attempt $attempt) — retry in ${waitS}s. Old session not yet reaped.")
                 Log.w(TAG, "bind failed: ${e.message}")
+                // Re-attempt the stale-holder kill each retry: the first pass
+                // may have raced the old session's port release, or a new stale
+                // holder may have appeared since the session started.
+                if (cfg.killStaleByPort) killStaleHolderOfPort(c, cfg.remoteBindPort)
                 try { Thread.sleep(waitS * 1000L) } catch (_: InterruptedException) {
                     throw IOException("Interrupted while waiting to retry bind")
                 }
