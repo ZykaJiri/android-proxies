@@ -14,8 +14,6 @@ import java.util.concurrent.atomic.AtomicLong
 class HttpProxyServer(
     private val bindAddress: String,
     private val port: Int,
-    private val router: NetworkRouter? = null,
-    private val useCellular: Boolean = false,
 ) {
 
     val bytesUp = AtomicLong(0)
@@ -140,24 +138,6 @@ class HttpProxyServer(
     private fun openUpstream(host: String, port: Int): Socket? {
         val s = Socket()
         s.tcpNoDelay = true
-        if (useCellular) {
-            val net = router?.cellular()
-            if (net == null) {
-                Log.w(TAG, "cellular network not available; refusing upstream connect")
-                try { s.close() } catch (_: Exception) {}
-                return null
-            }
-            try {
-                net.bindSocket(s)
-            } catch (e: Exception) {
-                // Do NOT fall through to an unbound connect: that would exit
-                // over the default network (Wi-Fi) and leak the proxied traffic
-                // off cellular. Refuse instead.
-                Log.w(TAG, "bindSocket(cellular) failed; refusing to avoid Wi-Fi leak", e)
-                try { s.close() } catch (_: Exception) {}
-                return null
-            }
-        }
         return try {
             s.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
             s

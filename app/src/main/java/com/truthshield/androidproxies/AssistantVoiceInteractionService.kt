@@ -10,6 +10,15 @@ class AssistantVoiceInteractionService : VoiceInteractionService() {
 
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
+    override fun onCreate() {
+        super.onCreate()
+        // Set as early as possible: after a reboot the framework re-binds this
+        // service in a fresh process, and consumers (AirplaneCycler) may look
+        // for the instance before onReady() lands.
+        instance = this
+        Log.i(TAG, "onCreate: voice interaction service created")
+    }
+
     override fun onReady() {
         super.onReady()
         instance = this
@@ -40,6 +49,21 @@ class AssistantVoiceInteractionService : VoiceInteractionService() {
         const val EXTRA_AIRPLANE_ENABLED = "airplane_mode_enabled"
 
         @Volatile var instance: AssistantVoiceInteractionService? = null
+
+        /**
+         * Wait up to [timeoutMs] for the framework to bind this service (after a
+         * reboot the binding can lag the start of ProxyService). Returns the
+         * instance once available, or null on timeout.
+         */
+        fun awaitInstance(timeoutMs: Long): AssistantVoiceInteractionService? {
+            instance?.let { return it }
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                try { Thread.sleep(200) } catch (_: InterruptedException) { return instance }
+                instance?.let { return it }
+            }
+            return instance
+        }
 
         fun isDefaultAssistant(context: Context): Boolean {
             val current = Settings.Secure.getString(

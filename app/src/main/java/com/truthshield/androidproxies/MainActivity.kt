@@ -3,6 +3,7 @@ package com.truthshield.androidproxies
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -14,6 +15,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -29,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var battStatus: TextView
     private lateinit var a11yStatus: TextView
+    private lateinit var rebootStatus: TextView
     private lateinit var toggleBtn: Button
 
     private val stateReceiver = object : BroadcastReceiver() {
@@ -68,15 +71,21 @@ class MainActivity : AppCompatActivity() {
         val remotePort = findViewById<EditText>(R.id.remoteBindPort)
         val localPort = findViewById<EditText>(R.id.localProxyPort)
         val killStale = findViewById<CheckBox>(R.id.killStale)
-        val splitNetworks = findViewById<CheckBox>(R.id.splitNetworks)
+        val useSshTunnel = findViewById<CheckBox>(R.id.useSshTunnel)
+        val sshSection = findViewById<View>(R.id.sshSection)
         val cycleEnabled = findViewById<CheckBox>(R.id.cycleEnabled)
         val cycleInterval = findViewById<EditText>(R.id.cycleInterval)
         val cycleDuration = findViewById<EditText>(R.id.cycleDuration)
+        val tunnelCount = findViewById<EditText>(R.id.tunnelCount)
         val a11yBtn = findViewById<Button>(R.id.a11yBtn)
         a11yStatus = findViewById(R.id.a11yStatus)
         val autoStart = findViewById<CheckBox>(R.id.autoStart)
         val battBtn = findViewById<Button>(R.id.battBtn)
         battStatus = findViewById(R.id.battStatus)
+        val autoReboot = findViewById<CheckBox>(R.id.autoReboot)
+        val rebootInterval = findViewById<EditText>(R.id.rebootInterval)
+        val rebootTestBtn = findViewById<Button>(R.id.rebootTestBtn)
+        rebootStatus = findViewById(R.id.rebootStatus)
         toggleBtn = findViewById(R.id.toggleBtn)
         status = findViewById(R.id.status)
 
@@ -89,17 +98,22 @@ class MainActivity : AppCompatActivity() {
         remotePort.setText(settings.remoteBindPort.toString())
         localPort.setText(settings.localProxyPort.toString())
         killStale.isChecked = settings.killStale
-        splitNetworks.isChecked = settings.splitNetworks
+        useSshTunnel.isChecked = settings.useSshTunnel
+        sshSection.visibility = if (settings.useSshTunnel) View.VISIBLE else View.GONE
         cycleEnabled.isChecked = settings.cycleEnabled
         cycleInterval.setText(settings.cycleIntervalSec.toString())
         cycleDuration.setText(settings.airplaneOnSec.toString())
+        tunnelCount.setText(settings.tunnelCount.toString())
         autoStart.isChecked = settings.autoStart
+        autoReboot.isChecked = settings.autoReboot
+        rebootInterval.setText(settings.rebootIntervalSec.toString())
 
         killStale.setOnCheckedChangeListener { _, checked ->
             settings.killStale = checked
         }
-        splitNetworks.setOnCheckedChangeListener { _, checked ->
-            settings.splitNetworks = checked
+        useSshTunnel.setOnCheckedChangeListener { _, checked ->
+            settings.useSshTunnel = checked
+            sshSection.visibility = if (checked) View.VISIBLE else View.GONE
         }
         cycleEnabled.setOnCheckedChangeListener { _, checked ->
             settings.cycleEnabled = checked
@@ -111,6 +125,11 @@ class MainActivity : AppCompatActivity() {
 
         battBtn.setOnClickListener { requestBatteryExempt() }
 
+        autoReboot.setOnCheckedChangeListener { _, checked ->
+            settings.autoReboot = checked
+        }
+        rebootTestBtn.setOnClickListener { confirmTestReboot() }
+
         toggleBtn.setOnClickListener {
             if (isServiceRunning()) {
                 ProxyService.stop(this)
@@ -118,46 +137,56 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val hostV = host.text.toString().trim()
-            val portV = port.text.toString().toIntOrNull()
-            val userV = user.text.toString().trim()
-            val keyV = key.text.toString()
-            val passV = pass.text.toString()
-            val rhostV = remoteHost.text.toString().trim().ifEmpty { "127.0.0.1" }
-            val rportV = remotePort.text.toString().toIntOrNull()
+            val useSsh = useSshTunnel.isChecked
             val lportV = localPort.text.toString().toIntOrNull()
-
-            if (hostV.isEmpty() || userV.isEmpty() ||
-                portV == null || rportV == null || lportV == null
-            ) {
-                Toast.makeText(this, "Fill host, user, and all ports", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (portV !in 1..65535 || rportV !in 1..65535 || lportV !in 1..65535) {
-                Toast.makeText(this, "Ports must be 1-65535", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val hasKey = keyV.isNotBlank()
-            val hasPass = passV.isNotBlank()
-            if (!hasKey && !hasPass) {
-                Toast.makeText(this, "Provide either a private key or a password", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (hasKey && hasPass) {
-                Toast.makeText(this, "Provide only one: private key OR password", Toast.LENGTH_SHORT).show()
+            if (lportV == null || lportV !in 1..65535) {
+                Toast.makeText(this, "Set a valid local proxy port (1-65535)", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            settings.sshHost = hostV
-            settings.sshPort = portV
-            settings.sshUser = userV
-            settings.privateKeyPem = keyV
-            settings.password = passV
-            settings.remoteBindHost = rhostV
-            settings.remoteBindPort = rportV
+            if (useSsh) {
+                val hostV = host.text.toString().trim()
+                val portV = port.text.toString().toIntOrNull()
+                val userV = user.text.toString().trim()
+                val keyV = key.text.toString()
+                val passV = pass.text.toString()
+                val rhostV = remoteHost.text.toString().trim().ifEmpty { "127.0.0.1" }
+                val rportV = remotePort.text.toString().toIntOrNull()
+
+                if (hostV.isEmpty() || userV.isEmpty() || portV == null || rportV == null) {
+                    Toast.makeText(this, "Fill host, user, and all ports", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (portV !in 1..65535 || rportV !in 1..65535) {
+                    Toast.makeText(this, "Ports must be 1-65535", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val hasKey = keyV.isNotBlank()
+                val hasPass = passV.isNotBlank()
+                if (!hasKey && !hasPass) {
+                    Toast.makeText(this, "Provide either a private key or a password", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (hasKey && hasPass) {
+                    Toast.makeText(this, "Provide only one: private key OR password", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                settings.sshHost = hostV
+                settings.sshPort = portV
+                settings.sshUser = userV
+                settings.privateKeyPem = keyV
+                settings.password = passV
+                settings.remoteBindHost = rhostV
+                settings.remoteBindPort = rportV
+                tunnelCount.text.toString().toIntOrNull()?.let { settings.tunnelCount = it.coerceIn(1, 16) }
+            }
+
+            settings.useSshTunnel = useSsh
             settings.localProxyPort = lportV
             cycleInterval.text.toString().toIntOrNull()?.let { settings.cycleIntervalSec = it.coerceAtLeast(30) }
             cycleDuration.text.toString().toIntOrNull()?.let { settings.airplaneOnSec = it.coerceAtLeast(2) }
+            rebootInterval.text.toString().toIntOrNull()?.let { settings.rebootIntervalSec = it.coerceAtLeast(60) }
 
             maybeRequestNotificationPermission()
             ProxyService.start(this)
@@ -176,6 +205,7 @@ class MainActivity : AppCompatActivity() {
         applyRunningState(isServiceRunning())
         refreshBatteryStatus()
         refreshA11yStatus()
+        refreshRebootStatus()
     }
 
     override fun onPause() {
@@ -192,6 +222,31 @@ class MainActivity : AppCompatActivity() {
         val ok = AssistantVoiceInteractionService.isDefaultAssistant(this)
         a11yStatus.text = if (ok) "Default digital assistant: this app ✓"
         else "Default digital assistant: NOT this app — airplane cycling won't work until set"
+    }
+
+    private fun refreshRebootStatus() {
+        rebootStatus.text = when (RebootHelper.availableMethod(this)) {
+            "device-owner" -> "Reboot method: device owner ✓"
+            "root" -> "Reboot method: root ✓"
+            else -> "Reboot method: NONE — needs root or device-owner provisioning"
+        }
+    }
+
+    private fun confirmTestReboot() {
+        val method = RebootHelper.availableMethod(this)
+        if (method == "none") {
+            Toast.makeText(this, "No reboot method available — grant root or set device owner first", Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Reboot now?")
+            .setMessage("This will immediately reboot the phone (via $method) to verify it works.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Reboot") { _, _ ->
+                val err = RebootHelper.reboot(this)
+                if (err != null) Toast.makeText(this, err, Toast.LENGTH_LONG).show()
+            }
+            .show()
     }
 
     private fun requestAssistantRole() {

@@ -16,6 +16,31 @@
             android:layout_width="match_parent"
             android:layout_height="24dp" />
 
+        <CheckBox
+            android:id="@+id/useSshTunnel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Use SSH tunnel" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:text="On: reverse SSH tunnel exposes the proxy on the server (loopback only). Off: proxy listens on 0.0.0.0 so a separate WireGuard tunnel can reach it; SSH settings below are ignored." />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <LinearLayout
+            android:id="@+id/sshSection"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -107,6 +132,20 @@
             android:inputType="number"
             android:autofillHints="" />
 
+        <EditText
+            android:id="@+id/tunnelCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="parallel SSH tunnels (1)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:text="N tunnels reverse-forward consecutive server ports (base, base+1, …) to spread connections across N TCP flows. Needs a load balancer on the server fronting those ports. Kill-stale is ignored when &gt; 1." />
+
         <CheckBox
             android:id="@+id/killStale"
             android:layout_width="match_parent"
@@ -126,6 +165,8 @@
             android:layout_marginBottom="12dp"
             android:background="?android:attr/listDivider" />
 
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -139,18 +180,6 @@
             android:hint="local proxy port (8118)"
             android:inputType="number"
             android:autofillHints="" />
-
-        <CheckBox
-            android:id="@+id/splitNetworks"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Split networks: Wi-Fi for SSH · Cellular for proxy" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="11sp"
-            android:text="When enabled, the SSH tunnel binds to Wi-Fi and outbound proxy fetches bind to cellular. Requires both networks active." />
 
         <View
             android:layout_width="match_parent"
@@ -230,6 +259,54 @@
 
         <TextView
             android:id="@+id/battStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="4dp"
+            android:text="" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Automatic reboot"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/autoReboot"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Periodically reboot the phone" />
+
+        <EditText
+            android:id="@+id/rebootInterval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="reboot interval (seconds, e.g. 21600 = 6h)"
+            android:inputType="number"
+            android:autofillHints="" />
+
+        <Button
+            android:id="@+id/rebootTestBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Test reboot now" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:text="Needs root or device-owner. Provision: adb shell dpm set-device-owner com.truthshield.androidproxies/.RebootAdminReceiver" />
+
+        <TextView
+            android:id="@+id/rebootStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="12sp"

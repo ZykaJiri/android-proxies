@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class SshTunnelManager(
     private val cfg: Config,
-    private val router: NetworkRouter?,
     private val onStatus: (String) -> Unit,
 ) {
     data class Config(
@@ -30,7 +29,6 @@ class SshTunnelManager(
         val localProxyHost: String,
         val localProxyPort: Int,
         val killStaleByPort: Boolean,
-        val useWifi: Boolean,
     )
 
     private val running = AtomicBoolean(false)
@@ -122,16 +120,7 @@ class SshTunnelManager(
         c.timeout = 30_000
         c.connection.keepAlive.keepAliveInterval = 15
 
-        if (cfg.useWifi) {
-            val r = router ?: throw IOException("Wi-Fi routing requested but no NetworkRouter")
-            onStatus("Waiting for Wi-Fi to bind SSH socket…")
-            val wifi = r.waitForWifi(10_000)
-                ?: throw IOException("Wi-Fi network not available")
-            c.socketFactory = BoundSocketFactory(wifi)
-            onStatus("Connecting to ${cfg.host}:${cfg.port} via Wi-Fi…")
-        } else {
-            onStatus("Connecting to ${cfg.host}:${cfg.port}…")
-        }
+        onStatus("Connecting to ${cfg.host}:${cfg.port}…")
 
         c.connect(cfg.host, cfg.port)
         client = c

@@ -58,9 +58,21 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt(K_AIRPLANE_DUR, 5)
         set(v) { prefs.edit().putInt(K_AIRPLANE_DUR, v).apply() }
 
-    var splitNetworks: Boolean
-        get() = prefs.getBoolean(K_SPLIT, false)
-        set(v) { prefs.edit().putBoolean(K_SPLIT, v).apply() }
+    var useSshTunnel: Boolean
+        get() = prefs.getBoolean(K_USE_SSH, true)
+        set(v) { prefs.edit().putBoolean(K_USE_SSH, v).apply() }
+
+    var tunnelCount: Int
+        get() = prefs.getInt(K_TUNNELS, 1)
+        set(v) { prefs.edit().putInt(K_TUNNELS, v).apply() }
+
+    var autoReboot: Boolean
+        get() = prefs.getBoolean(K_AUTO_REBOOT, false)
+        set(v) { prefs.edit().putBoolean(K_AUTO_REBOOT, v).apply() }
+
+    var rebootIntervalSec: Int
+        get() = prefs.getInt(K_REBOOT_INTERVAL, 21_600)
+        set(v) { prefs.edit().putInt(K_REBOOT_INTERVAL, v).apply() }
 
     companion object {
         private const val K_HOST = "ssh_host"
@@ -76,6 +88,9 @@ class SettingsStore(context: Context) {
         private const val K_CYCLE_ON = "cycle_enabled"
         private const val K_CYCLE_INTERVAL = "cycle_interval_sec"
         private const val K_AIRPLANE_DUR = "airplane_on_sec"
-        private const val K_SPLIT = "split_networks"
+        private const val K_USE_SSH = "use_ssh_tunnel"
+        private const val K_TUNNELS = "tunnel_count"
+        private const val K_AUTO_REBOOT = "auto_reboot"
+        private const val K_REBOOT_INTERVAL = "reboot_interval_sec"
     }
 }
