@@ -21,11 +21,11 @@ import androidx.core.app.NotificationCompat
 class ProxyService : Service() {
 
     private var proxy: HttpProxyServer? = null
-    private var tunnel: SshTunnelManager? = null
+    private var tunnel: TunnelGroup? = null
     private var cycler: AirplaneCycler? = null
+    private var rebootScheduler: RebootScheduler? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    private var router: NetworkRouter? = null
     private var meterThread: Thread? = null
     @Volatile private var meterRunning = false
 
@@ -52,14 +52,16 @@ class ProxyService : Service() {
     private fun startEverything() {
         val settings = SettingsStore(this)
         val proxyPort = settings.localProxyPort
+        val useSsh = settings.useSshTunnel
 
-        router = if (settings.splitNetworks) NetworkRouter(this) else null
-
+        // With SSH, only the local reverse-forwarder needs to reach the proxy,
+        // so loopback is safest. Without SSH (e.g. a separate WireGuard tunnel
+        // fronts it), the remote peer reaches the proxy over the wg interface,
+        // which loopback can't serve — bind all interfaces instead.
+        val bindAddr = if (useSsh) "127.0.0.1" else "0.0.0.0"
         proxy = HttpProxyServer(
-            bindAddress = "127.0.0.1",
+            bindAddress = bindAddr,
             port = proxyPort,
-            router = router,
-            useCellular = settings.splitNetworks,
         ).also { it.start() }
 
         wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
@@ -75,25 +77,37 @@ class ProxyService : Service() {
             }
         }
 
-        val newTunnel = SshTunnelManager(
-            SshTunnelManager.Config(
-                host = settings.sshHost,
-                port = settings.sshPort,
-                user = settings.sshUser,
-                privateKeyPem = settings.privateKeyPem,
-                password = settings.password,
-                remoteBindHost = settings.remoteBindHost,
-                remoteBindPort = settings.remoteBindPort,
-                localProxyHost = "127.0.0.1",
-                localProxyPort = proxyPort,
-                killStaleByPort = settings.killStale,
-                useWifi = settings.splitNetworks,
-            ),
-            router = router,
-            onStatus = sshStatus,
-        )
-        tunnel = newTunnel
-        newTunnel.start()
+        val newTunnel = if (useSsh) {
+            val count = settings.tunnelCount.coerceIn(1, MAX_TUNNELS)
+            // Each tunnel reverse-forwards a consecutive server port (base, base+1, …)
+            // all pointing at the same local proxy; a server-side load balancer
+            // fronts them. Kill-stale must be off with >1 tunnel — it identifies
+            // holders by process and would kill sibling tunnels (same user, @notty).
+            val killStale = settings.killStale && count == 1
+            val mgrs = (0 until count).map { i ->
+                val statusCb: (String) -> Unit =
+                    if (i == 0) sshStatus else { s -> Log.d(TAG, "[T${i + 1}] $s") }
+                SshTunnelManager(
+                    SshTunnelManager.Config(
+                        host = settings.sshHost,
+                        port = settings.sshPort,
+                        user = settings.sshUser,
+                        privateKeyPem = settings.privateKeyPem,
+                        password = settings.password,
+                        remoteBindHost = settings.remoteBindHost,
+                        remoteBindPort = settings.remoteBindPort + i,
+                        localProxyHost = "127.0.0.1",
+                        localProxyPort = proxyPort,
+                        killStaleByPort = killStale,
+                    ),
+                    onStatus = statusCb,
+                )
+            }
+            TunnelGroup(mgrs).also { tunnel = it; it.start() }
+        } else {
+            tunnel = null
+            null
+        }
 
         registerNetworkCallback()
 
@@ -102,13 +116,23 @@ class ProxyService : Service() {
                 intervalSec = settings.cycleIntervalSec.coerceAtLeast(30),
                 airplaneOnDurationSec = settings.airplaneOnSec.coerceAtLeast(2),
                 tunnel = newTunnel,
+                context = applicationContext,
+                onStatus = { s -> lastStatus = s; updateNotification(s) },
+            ).also { it.start() }
+        }
+
+        if (settings.autoReboot) {
+            rebootScheduler = RebootScheduler(
+                intervalSec = settings.rebootIntervalSec.coerceAtLeast(60),
+                context = applicationContext,
                 onStatus = { s -> lastStatus = s; updateNotification(s) },
             ).also { it.start() }
         }
 
         startMeter()
 
-        updateNotification("Proxy on 127.0.0.1:$proxyPort · connecting tunnel…")
+        val mode = if (useSsh) "connecting tunnel…" else "direct (WireGuard fronts it)"
+        updateNotification("Proxy on $bindAddr:$proxyPort · $mode")
         broadcastState(true)
     }
 
@@ -183,12 +207,12 @@ class ProxyService : Service() {
     private fun stopEverything() {
         stopMeter()
         unregisterNetworkCallback()
+        try { rebootScheduler?.stop() } catch (_: Exception) {}
         try { cycler?.stop() } catch (_: Exception) {}
         try { tunnel?.stop() } catch (_: Exception) {}
         try { proxy?.stop() } catch (_: Exception) {}
-        try { router?.close() } catch (_: Exception) {}
         try { wakeLock?.takeIf { it.isHeld }?.release() } catch (_: Exception) {}
-        cycler = null; tunnel = null; proxy = null; router = null; wakeLock = null
+        rebootScheduler = null; cycler = null; tunnel = null; proxy = null; wakeLock = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         broadcastState(false)
         stopSelf()
@@ -264,6 +288,7 @@ class ProxyService : Service() {
         private const val NOTIF_ID = 1
         private const val TAG = "ProxyService"
         private const val METER_INTERVAL_MS = 2000L
+        private const val MAX_TUNNELS = 16
 
         fun start(context: Context) {
             val i = Intent(context, ProxyService::class.java)

@@ -14,8 +14,6 @@ import java.util.concurrent.atomic.AtomicLong
 class HttpProxyServer(
     private val bindAddress: String,
     private val port: Int,
-    private val router: NetworkRouter? = null,
-    private val useCellular: Boolean = false,
 ) {
 
     val bytesUp = AtomicLong(0)
@@ -140,17 +138,6 @@ class HttpProxyServer(
     private fun openUpstream(host: String, port: Int): Socket? {
         val s = Socket()
         s.tcpNoDelay = true
-        if (useCellular) {
-            val net = router?.cellular()
-            if (net == null) {
-                Log.w(TAG, "cellular network not available; refusing upstream connect")
-                try { s.close() } catch (_: Exception) {}
-                return null
-            }
-            try { net.bindSocket(s) } catch (e: Exception) {
-                Log.w(TAG, "bindSocket(cellular) failed", e)
-            }
-        }
         return try {
             s.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
             s
